@@ -267,6 +267,27 @@ sub push : Chained('api') PathPart('push') Args(0) {
     );
 }
 
+# Triggers every job that have an input of type `githubpulls` matching the repo on which a PR was created
+sub pull_request_github : Chained('api') PathPart('pull-request-github') Args(0) {
+    my ($self, $c) = @_;
+
+    $c->{stash}->{json}->{jobsetsTriggered} = [];
+
+    my $in = $c->request->{data};
+    my $owner = $in->{repository}->{owner}->{name} or die;
+    my $repo = $in->{repository}->{name} or die;
+    print STDERR "got push from GitHub repository $owner/$repo\n";
+
+    triggerJobset($self, $c, $_, 0) foreach $c->model('DB::Jobsets')->search(
+	    { 'jobsetinputs.type' => "githubpulls" },
+	    { join => {'jobsetinputs' => 'jobsetinputalts'},
+	      where => \ [ ' LOWER( jobsetinputalts.value ) = LOWER ( ? ) ', [ 'value', "$owner $repo"] ]
+	    }
+	);
+
+    $c->response->body("");
+}
+
 sub push_github : Chained('api') PathPart('push-github') Args(0) {
     my ($self, $c) = @_;
 
