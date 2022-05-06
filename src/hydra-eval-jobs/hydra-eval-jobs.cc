@@ -127,9 +127,11 @@ static void worker(
 
         auto lockedFlake = lockFlake(state, flakeRef,
             LockFlags {
-                .updateLockFile = false,
-                .useRegistries = false,
-                .allowMutable = false,
+	        .updateLockFile = true ,
+		.writeLockFile  = false,
+		.useRegistries  = false,
+		.applyNixConfig = true ,
+		.allowMutable   = true ,
             });
 
         callFlake(state, lockedFlake, *vFlake);
