@@ -9,6 +9,7 @@ use JSON::MaybeXS;
 use Hydra::Helper::CatalystUtils;
 use File::Temp;
 use POSIX qw(strftime);
+use Data::Dumper;
 
 sub supportedInputTypes {
     my ($self, $inputTypes) = @_;
@@ -18,11 +19,17 @@ sub supportedInputTypes {
 sub _iterate {
     my ($url, $auth, $pulls, $ua) = @_;
     my $req = HTTP::Request->new('GET', $url);
+    print STDERR "[GithubPulls] ENTERING\n";
     $req->header('Accept' => 'application/vnd.github.v3+json');
     $req->header('Authorization' => $auth) if defined $auth;
+    print STDERR "[GithubPulls] REQ:\n";
+    print Dumper $req;
     my $res = $ua->request($req);
+    print Dumper $res;
+    print STDERR "[GithubPulls] RES:\n";
+    print STDERR "\n";
     my $content = $res->decoded_content;
-    die "Error pulling from the github pulls API: $content\n"
+    die "[GithubPulls] Error pulling from the github pulls API: $content\n"
         unless $res->is_success;
     my $pulls_list = decode_json $content;
     # TODO Stream out the json instead

@@ -8,6 +8,7 @@ use JSON::MaybeXS;
 use LWP::UserAgent;
 use Hydra::Helper::CatalystUtils;
 use List::Util qw(max);
+use Data::Dumper;
 
 sub isEnabled {
     my ($self) = @_;
@@ -31,16 +32,28 @@ sub common {
     my @config = defined $cfg ? ref $cfg eq "ARRAY" ? @$cfg : ($cfg) : ();
     my $baseurl = $self->{config}->{'base_uri'} || "http://localhost:3000";
 
+    my $n = @config;
+    print STDERR "[GithubStatus] there is [$n] githubstatus keys in the config file";
+
     # Find matching configs
     foreach my $build ($topbuild, @{$dependents}) {
-        my $jobName = showJobName $build;
+	my $jobName = showJobName $build;
+	print STDERR "[GithubStatus] Dealing with job [$jobName]";
         my $evals = $topbuild->jobsetevals;
         my $ua = LWP::UserAgent->new();
 
         foreach my $conf (@config) {
+	    print STDERR "[GithubStatus] Try config:\n";
+	    print Dumper $conf;
+	    if ($jobName =~ /^$conf->{jobs}$/) {
+	    } else {
+		print STDERR "[GithubStatus] config rejected for job [$jobName]\n";
+	    }
             next unless $jobName =~ /^$conf->{jobs}$/;
+	    print STDERR "[GithubStatus] config accepted for job [$jobName]\n";
             # Don't send out "pending" status updates if the build is already finished
             next if !$finished && $build->finished == 1;
+	    print STDERR "[GithubStatus] L56, job [$jobName]\n";
 
             my $contextTrailer = $conf->{excludeBuildFromContext} ? "" : (":" . $build->id);
             my $github_job_name = $jobName =~ s/-pr-\d+//r;
@@ -54,11 +67,14 @@ sub common {
                     description => $conf->{description} // "Hydra build #" . $build->id . " of $jobName",
                     context => $context
                 });
+	    print STDERR "[GithubStatus] BODY IS:\n";
+	    print Dumper $body;
             my $inputs_cfg = $conf->{inputs};
             my @inputs = defined $inputs_cfg ? ref $inputs_cfg eq "ARRAY" ? @$inputs_cfg : ($inputs_cfg) : ();
             my %seen = map { $_ => {} } @inputs;
             while (my $eval = $evals->next) {
                 if (defined($cachedEval) && $cachedEval->id != $eval->id) {
+		    print STDERR "[GithubStatus] cachedEval!!!\n";
                     next;
                 }
 
@@ -66,7 +82,12 @@ sub common {
                     my ($input, $owner, $repo, $rev) = @_;
 
                     my $key = $owner . "-" . $repo . "-" . $rev;
-                    return if exists $seen{$input}->{$key};
+		    if (exists $seen{$input}->{$key}) {
+			print STDERR "[GithubStatus] Seen already\n";
+			return;
+		    }else{
+			print STDERR "[GithubStatus] Not seen already, processing\n";
+		    }
                     $seen{$input}->{$key} = 1;
 
                     my $url = "https://api.github.com/repos/$owner/$repo/statuses/$rev";
@@ -75,7 +96,12 @@ sub common {
                     $req->header('Accept' => 'application/vnd.github.v3+json');
                     $req->header('Authorization' => ($self->{config}->{github_authorization}->{$owner} // $conf->{authorization}));
                     $req->content($body);
+             	    print STDERR "[GithubStatus] REQ IS:\n";
+             	    print Dumper $req;
                     my $res = $ua->request($req);
+             	    print STDERR "[GithubStatus] RES IS:\n";
+             	    print Dumper $res;
+             	    print STDERR "[GithubStatus] -------";
                     print STDERR $res->status_line, ": ", $res->decoded_content, "\n" unless $res->is_success;
                     my $limit = $res->header("X-RateLimit-Limit");
                     my $limitRemaining = $res->header("X-RateLimit-Remaining");
@@ -98,15 +124,16 @@ sub common {
                     my $fl = $eval->flake;
                     print STDERR "Flake is $fl\n";
                     if ($eval->flake =~ m!github:([^/]+)/([^/]+)/([[:xdigit:]]{40})$! or $eval->flake =~ m!git\+ssh://git\@github.com/([^/]+)/([^/]+)\?.*rev=([[:xdigit:]]{40})$!) {
+                        print STDERR "[GithubStatus] LIGNE 127\n";
                         $sendStatus->("src", $1, $2, $3);
                     } else {
-                        print STDERR "Can't parse flake, skipping GitHub status update\n";
+                        print STDERR "[GithubStatus] Can't parse flake, skipping GitHub status update\n";
                     }
                 } else {
                     foreach my $input (@inputs) {
                         my $i = $eval->jobsetevalinputs->find({ name => $input, altnr => 0 });
                         if (! defined $i) {
-                            print STDERR "Evaluation $eval doesn't have input $input\n";
+                            print STDERR "[GithubStatus] Evaluation $eval doesn't have input $input\n";
                         }
                         next unless defined $i;
                         my $uri = $i->uri;
