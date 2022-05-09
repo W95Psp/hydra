@@ -120,10 +120,11 @@ sub common {
                     }
                 };
 
+		
                 if (defined $eval->flake) {
                     my $fl = $eval->flake;
                     print STDERR "Flake is $fl\n";
-                    if ($eval->flake =~ m!github:([^/]+)/([^/]+)/([[:xdigit:]]{40})$! or $eval->flake =~ m!git\+ssh://git\@github.com/([^/]+)/([^/]+)\?.*rev=([[:xdigit:]]{40})$!) {
+                    if ($eval->flake =~ m!github:([^/]+)/([^/]+)/([[:xdigit:]]{40})$! or $eval->flake =~ m!git\+(ssh|https)://git\@github.com/([^/]+)/([^/]+)\?.*rev=([[:xdigit:]]{40})$!) {
                         print STDERR "[GithubStatus] LIGNE 127\n";
                         $sendStatus->("src", $1, $2, $3);
                     } else {
