@@ -8,6 +8,7 @@ use JSON::MaybeXS;
 use LWP::UserAgent;
 use Hydra::Helper::CatalystUtils;
 use List::Util qw(max);
+use Data::Dumper;
 
 sub isEnabled {
     my ($self) = @_;
@@ -37,10 +38,14 @@ sub common {
         my $evals = $topbuild->jobsetevals;
         my $ua = LWP::UserAgent->new();
 
-        foreach my $conf (@config) {
+        foreach my $conf (@
+	    print STDERR "[GithubStatus] Try config:\n";
+	    print Dumper $conf;
             next unless $jobName =~ /^$conf->{jobs}$/;
+	    print STDERR "[GithubStatus] A\n";
             # Don't send out "pending" status updates if the build is already finished
             next if !$finished && $build->finished == 1;
+	    print STDERR "[GithubStatus] B\n";
 
             my $contextTrailer = $conf->{excludeBuildFromContext} ? "" : (":" . $build->id);
             my $github_job_name = $jobName =~ s/-pr-\d+//r;
@@ -59,11 +64,14 @@ sub common {
             my %seen = map { $_ => {} } @inputs;
             while (my $eval = $evals->next) {
                 if (defined($cachedEval) && $cachedEval->id != $eval->id) {
+		    print STDERR "[GithubStatus] CACHED\n";
                     next;
                 }
 
                 my $sendStatus = sub {
                     my ($input, $owner, $repo, $rev) = @_;
+		    print STDERR "[GithubStatus] sendStatus($input, $owner, $repo, $rev)\n";
+		    
 
                     my $key = $owner . "-" . $repo . "-" . $rev;
                     return if exists $seen{$input}->{$key};
@@ -95,6 +103,7 @@ sub common {
                 };
 
                 if (defined $eval->flake) {
+		    print STDERR "[GithubStatus] in flake\n";
                     my $fl = $eval->flake;
                     print STDERR "Flake is $fl\n";
                     if ($eval->flake =~ m!github:([^/]+)/([^/]+)/([[:xdigit:]]{40})$! or $eval->flake =~ m!git\+ssh://git\@github.com/([^/]+)/([^/]+)\?.*rev=([[:xdigit:]]{40})$!) {
