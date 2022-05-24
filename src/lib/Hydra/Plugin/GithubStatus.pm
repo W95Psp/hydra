@@ -38,7 +38,7 @@ sub common {
         my $evals = $topbuild->jobsetevals;
         my $ua = LWP::UserAgent->new();
 
-        foreach my $conf (@
+        foreach my $conf (@config) {
 	    print STDERR "[GithubStatus] Try config:\n";
 	    print Dumper $conf;
             next unless $jobName =~ /^$conf->{jobs}$/;
